@@ -18,11 +18,13 @@ On a Mac or Linux machine, run the following commands:
 ```
 git clone https://github.com/mingdaoai/domain-check.git
 cd domain-check
-pip install -r requirements.txt
-python main.py
+uv sync
+./main.py
 ```
 
-The app uses openai's API to support chat and generate domain names.  The key of the OpenAI API is saved in a file ~/.mingdaoai/openai.key
+Alternatively, you can use pip: `pip install -r requirements.txt` and run `python main.py`.
+
+The app uses DeepSeek's API to support chat and generate domain names.  The key of the DeepSeek API is saved in a file ~/.mingdaoai/deepseek.key
 
 # License
 

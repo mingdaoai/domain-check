@@ -1,3 +1,4 @@
+#!/usr/bin/env uv run --script
 import os
 import readline
 import json
@@ -257,13 +258,13 @@ def main():
     try:
         api_key = load_api_key()
         if not api_key:
-            error_msg = "Error: Anthropic API key not found. Please add it to ~/.mingdaoai/anthropic.key"
+            error_msg = "Error: DeepSeek API key not found. Please add it to ~/.mingdaoai/deepseek.key"
             print(error_msg)
             logger.error(error_msg)
             return
 
         openai_helper = OpenAIHelper(api_key)
-        logger.info("Anthropic API client initialized successfully")
+        logger.info("DeepSeek API client initialized successfully")
 
         print("Welcome to the Domain Name Finder!")
         print("Share your ideas for domain names, and I'll help you find unique options.")
@@ -345,8 +346,8 @@ def main():
                         prompt = (
                             f"Generate 20 unique and creative domain name suggestions, with 2 words, "
                             f"based on the following idea: {user_input}. "
-                            f"Each domain must be no longer than {max_length} characters including '.org'. "
-                            f"Generate domains with the .org extension (e.g., example.org). "
+                            f"Each domain must be no longer than {max_length} characters including '.com'. "
+                            f"Generate domains with the .com extension (e.g., example.com). "
                             f"IMPORTANT: The domain name will be HEARD by the audience (spoken aloud), not just read. "
                             f"They need to remember it for a few minutes before typing it into their browser. "
                             f"Therefore, domains must be: "

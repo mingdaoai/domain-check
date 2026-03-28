@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def load_api_key():
-    key_path = os.path.expanduser("~/.mingdaoai/anthropic.key")
+    key_path = os.path.expanduser("~/.mingdaoai/deepseek.key")
     try:
         with open(key_path, "r") as key_file:
             api_key = key_file.read().strip()

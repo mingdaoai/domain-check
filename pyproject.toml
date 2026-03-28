@@ -1,0 +1,13 @@
+[project]
+name = "domain-check"
+version = "0.1.0"
+description = "Domain name chatbot to help find unique domain names"
+requires-python = ">=3.8"
+dependencies = [
+    "openai",
+    "python-whois",
+]
+
+# uv-specific configuration (optional)
+[tool.uv]
+# No additional configuration needed

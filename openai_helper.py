@@ -1,15 +1,18 @@
 import logging
-from anthropic import Anthropic
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
 class OpenAIHelper:
     def __init__(self, api_key):
         try:
-            self.client = Anthropic(api_key=api_key)
-            logger.info("Anthropic client initialized")
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.deepseek.com"
+            )
+            logger.info("DeepSeek client initialized")
         except Exception as e:
-            logger.error(f"Error initializing Anthropic client: {e}", exc_info=True)
+            logger.error(f"Error initializing DeepSeek client: {e}", exc_info=True)
             raise
 
     def generate_domain_names(self, user_input):
@@ -20,33 +23,36 @@ class OpenAIHelper:
             prompt = (f"{user_input}."
                       f" Provide the domain names in a JSON format, with a key 'domain_names' and value of an array"
                       f" and each suggestion as a string in the array."
-                      f" Include the .org extension in each domain name (e.g., example.org).")
+                      f" Include the .com extension in each domain name (e.g., example.com).")
 
             try:
-                response = self.client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
+                response = self.client.chat.completions.create(
+                    model="deepseek-chat",
                     max_tokens=4096,
-                    system="You are a helpful assistant that generates creative domain name suggestions in JSON format. "
+                    temperature=0.7,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant that generates creative domain name suggestions in JSON format. "
                            "When generating domains, prioritize names that are easy to remember and spell correctly "
                            "when heard by an audience, as they need to recall the domain name after hearing it spoken. "
                            "Consider international audiences - use simple, common English words that are accessible "
                            "to non-native English speakers. Prefer singular forms over plural when possible to make "
                            "domains simpler and easier to remember. The audience may prefer pinyin romanization in domain names, "
-                           "so consider incorporating pinyin-based words when appropriate.",
-                    messages=[
+                           "so consider incorporating pinyin-based words when appropriate."},
                         {"role": "user", "content": prompt}
                     ]
                 )
-                logger.debug("Received response from Anthropic API")
+                logger.debug("Received response from DeepSeek API")
             except Exception as e:
-                logger.error(f"Error calling Anthropic API: {e}", exc_info=True)
+                logger.error(f"Error calling DeepSeek API: {e}", exc_info=True)
                 raise
 
             import json
             import re
 
             try:
-                message_content = response.content[0].text
+                message_content = response.choices[0].message.content
+                if message_content is None:
+                    message_content = ""
                 logger.debug(f"Response content length: {len(message_content)}")
             except (IndexError, AttributeError) as e:
                 logger.error(f"Error accessing response content: {e}. Response structure: {response}", exc_info=True)
@@ -83,20 +89,24 @@ class OpenAIHelper:
                       f" and each suggestion as a string in the array.")
 
             try:
-                response = self.client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
+                response = self.client.chat.completions.create(
+                    model="deepseek-chat",
                     max_tokens=4096,
-                    system="You are a helpful assistant that ranks domain names based on memorability.",
+                    temperature=0.7,
                     messages=[
+                        {"role": "system", "content": "You are a helpful assistant that ranks domain names based on memorability."},
                         {"role": "user", "content": prompt}
                     ]
                 )
             except Exception as e:
-                logger.error(f"Error calling Anthropic API for ranking: {e}", exc_info=True)
+                logger.error(f"Error calling DeepSeek API for ranking: {e}", exc_info=True)
                 raise
 
             try:
-                rankings = response.content[0].text
+                rankings = response.choices[0].message.content
+                if rankings is None:
+                    rankings = ""
+                logger.debug(f"Ranking response length: {len(rankings)}")
             except (IndexError, AttributeError) as e:
                 logger.error(f"Error accessing ranking response content: {e}. Response: {response}", exc_info=True)
                 raise
