@@ -1,2 +1,4 @@
 openai
 python-whois
+dnspython
+boto3

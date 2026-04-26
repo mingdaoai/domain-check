@@ -149,14 +149,18 @@ def save_domains_to_cache(query, available_domains, unavailable_domains, existin
         raise
 
 
-def check_domain_with_backoff(domain, base_delay=2, max_retries=3):
-    """Check domain availability with exponential backoff on failure
+def check_domain_with_backoff(domain, base_delay=0, max_retries=3):
+    """Check domain availability with exponential backoff on failure.
+    
+    The base_delay parameter is only used for exponential backoff between retries
+    when errors occur. There is no delay between successful domain checks.
+    AWS Route 53 API calls have a separate 1-second rate limit.
+    
     Returns (is_available, status) where status can be 'available', 'taken', or 'error'
     """
     for attempt in range(max_retries):
         try:
-            # Add base delay between each domain check
-            time.sleep(base_delay)
+
             is_available, status = check_domain_availability(domain)
             
             # If we got a successful result (available or taken), return it
@@ -193,20 +197,38 @@ def check_domain_with_backoff(domain, base_delay=2, max_retries=3):
     return None, 'error'
 
 
-def get_max_domain_length(cached_domains, default_max=30):
-    """Get the length of the 20th longest domain, or default if less than 20 domains exist"""
+def get_max_domain_length(cached_domains, available_domains=None, default_max=30, min_length=12):
+    """Calculate maximum allowed domain length based on cached domains.
+    
+    Uses 90th percentile length of cached domains, clamped between
+    min_length and default_max. If available domains exist, ensures
+    max_length is at least the length of the longest available domain.
+    """
     if not cached_domains:
         return default_max
     
-    # Sort domains by length in descending order
-    sorted_by_length = sorted(cached_domains, key=len, reverse=True)
+    # Get sorted lengths of cached domains
+    lengths = sorted([len(d) for d in cached_domains])
     
-    # If we have at least 20 domains, use the 20th one's length
-    if len(sorted_by_length) >= 20:
-        return len(sorted_by_length[19])  # 19 is the 20th index (0-based)
+    # Use 90th percentile length to allow more creative/longer domains
+    percentile_idx = int(0.90 * len(lengths))
+    if percentile_idx >= len(lengths):
+        percentile_idx = len(lengths) - 1
+    suggested_length = lengths[percentile_idx]
     
-    # If we have less than 20 domains, use the longest one's length
-    return len(sorted_by_length[0]) if sorted_by_length else default_max
+    # If we have available domains, ensure we can generate similar lengths
+    if available_domains and len(available_domains) > 0:
+        available_lengths = [len(d) for d in available_domains]
+        max_available_length = max(available_lengths)
+        # Use the larger of suggested length or max available length
+        suggested_length = max(suggested_length, max_available_length)
+    
+    # Clamp to reasonable bounds
+    if suggested_length < min_length:
+        return min_length
+    if suggested_length > default_max:
+        return default_max
+    return suggested_length
 
 
 def check_domains_batch(domains, known_domains, available_list, unavailable_list, max_length):
@@ -337,16 +359,19 @@ def main():
 
                 while True:
                     try:
+                        # Track available domains count at start of this iteration
+                        available_before_iteration = len(available_domains)
+                        
                         # Start with all previously known domains to avoid duplicates
                         known_domains = cached_data['available_domains'] + cached_data['unavailable_domains']
                         
                         # Get maximum allowed domain length based on existing domains
-                        max_length = get_max_domain_length(known_domains)
+                        max_length = get_max_domain_length(known_domains, cached_data['available_domains'])
                         
                         prompt = (
-                            f"Generate 20 unique and creative domain name suggestions, with 2 words, "
+                            f"Generate 20 unique and creative domain name suggestions, typically 1-3 words, "
                             f"based on the following idea: {user_input}. "
-                            f"Each domain must be no longer than {max_length} characters including '.com'. "
+                            f"CRITICAL: Each domain must be no longer than {max_length} characters including '.com'. This is a hard limit - any domain longer than {max_length} characters will be automatically filtered out. "
                             f"Generate domains with the .com extension (e.g., example.com). "
                             f"IMPORTANT: The domain name will be HEARD by the audience (spoken aloud), not just read. "
                             f"They need to remember it for a few minutes before typing it into their browser. "
@@ -358,6 +383,7 @@ def main():
                             f"(5) Easy to remember for non-native English speakers - use common English words, avoid idioms, slang, or culturally specific references "
                             f"(6) Avoid plural forms if possible - prefer singular nouns to make the domain simpler and easier to remember "
                             f"(7) Consider using pinyin romanization when appropriate - the audience may prefer pinyin-based words in the domain name."
+                            f"(8) Do not use zen or other japanese words."
                         )
                         if known_domains:
                             prompt += f"\nPlease avoid these existing domains: {', '.join(known_domains)}"
@@ -373,12 +399,12 @@ def main():
                         print("\nChecking domain availability...")
                         check_domains_batch(domain_suggestions, known_domains, available_domains, unavailable_domains, max_length)
 
-                        while not available_domains:
+                        while len(available_domains) == available_before_iteration:
                             print("\nNo new available domains found. Generating more suggestions...")
                             all_unavailable = known_domains + unavailable_domains
                             new_prompt = (
                                 f"{prompt} Please avoid these already taken domains: {', '.join(all_unavailable)}. "
-                                f"Remember to keep domains under {max_length} characters, and prioritize "
+                                f"CRITICAL: Keep domains under {max_length} characters (hard limit), and prioritize "
                                 f"domains that are easily remembered and spelled correctly when heard, "
                                 f"especially for non-native English speakers. Prefer singular forms over plural when possible. "
                                 f"Consider using pinyin romanization when it would help the audience remember the domain."
